@@ -1,10 +1,10 @@
 """This model creates the ModelInterface for Tensorflow."""
 from typing import Optional, Tuple
 
-from tensorflow.keras.activations import linear, softmax
-from tensorflow.keras.layers import Dense
-from tensorflow.keras import Model
-from tensorflow.keras.models import clone_model
+from keras.activations import linear, softmax
+from keras.layers import Dense, Activation
+from keras import Model
+from keras.models import clone_model
 import numpy as np
 
 from ..helpers.model_interface import ModelInterface
@@ -33,22 +33,27 @@ class TensorFlowModel(ModelInterface):
 
         weights = self.model.layers[-1].get_weights()
 
-        output_layer = Dense(**config)(self.model.layers[-2].output)
-        new_model = Model(inputs=[self.model.input], outputs=[output_layer])
-        new_model.layers[-1].set_weights(weights)
-
-        return new_model(x, training=False).numpy()
+        if isinstance(self.model.layers[-1], Activation):
+            output_layer = self.model.layers[-2].output
+            new_model = Model(inputs=[self.model.input], outputs=[output_layer])
+        else:
+            # TODO: make sure this works
+            output_layer = Dense(**config)(self.model.layers[-2].output)
+            new_model = Model(inputs=[self.model.input], outputs=[output_layer])
+            new_model.layers[-1].set_weights(weights)
+        return new_model.predict(x)
 
     def shape_input(
         self, x: np.array, shape: Tuple[int, ...], channel_first: Optional[bool] = None
     ):
         """
+        TODO: shape does not need to be passed
         Reshape input into model expected input.
-        channel_first: Explicitely state if x is formatted channel first (optional).
+        channel_first: Explicitly state if x is formatted channel first (optional).
         """
         if channel_first is None:
             channel_first = utils.infer_channel_first
-        x = x.reshape(1, *shape)
+        x = x.reshape(-1, *self.model.input_shape[1:])
         if self.channel_first:
             return utils.make_channel_first(x, channel_first)
         return utils.make_channel_last(x, channel_first)

@@ -7,6 +7,8 @@ from importlib import util
 from skimage.segmentation import slic, felzenszwalb
 from ..helpers.model_interface import ModelInterface
 from ..helpers import asserts
+import keras
+
 
 if util.find_spec("torch"):
     import torch
@@ -197,12 +199,12 @@ def get_wrapped_model(model: ModelInterface, channel_first: bool) -> ModelInterf
     Returns
         A wrapped ModelInterface model.
     """
-    if isinstance(model, tf.keras.Model):
+    if isinstance(model, keras.Model):
         return TensorFlowModel(model, channel_first)
     if isinstance(model, torch.nn.modules.module.Module):
         return PyTorchModel(model, channel_first)
     raise ValueError(
-        "Model needs to be tf.keras.Model or torch.nn.modules.module.Module."
+        "Model needs to be keras.Model or torch.nn.modules.module.Module."
     )
 
 

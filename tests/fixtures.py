@@ -6,7 +6,7 @@ import torch
 import torchvision
 from torchvision import transforms
 import numpy as np
-from ..quantus.helpers.models import LeNet, LeNetTF, ConvNet1D, ConvNet1DTF
+from ..quantus.helpers.models import LeNet, ModelTF, ConvNet1D, ConvNet1DTF
 from tensorflow.keras.models import load_model
 import tensorflow as tf
 from ..quantus.helpers.pytorch_model import PyTorchModel
@@ -26,7 +26,7 @@ def load_mnist_model():
 @pytest.fixture(scope="session", autouse=True)
 def load_mnist_model_tf():
     """Load a pre-trained LeNet classification model (architecture at quantus/helpers/models)."""
-    model = LeNetTF()
+    model = ModelTF()
     model.load_weights("tutorials/assets/mnist_tf_weights/")
     return model
 
@@ -60,7 +60,7 @@ def load_1d_3ch_conv_model_tf():
     """Load a pre-trained 1d-convolutional classification model (architecture at quantus/helpers/models)."""
     model = ConvNet1DTF(n_channels=3, seq_len=100, n_classes=10)
     # TODO: add trained model weights
-    # model = LeNetTF()
+    # model = ModelTF()
     # model.load_weights("tutorials/assets/mnist_tf_weights/")
     return model
 

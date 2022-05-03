@@ -73,7 +73,7 @@ if util.find_spec("tensorflow"):
 
     from tensorflow.keras.models import Sequential
 
-    class LeNetTF(Sequential):
+    class ModelTF(Sequential):
         """Network architecture adapted from: https://www.tensorflow.org/datasets/keras_example."""
 
         def __init__(self):
