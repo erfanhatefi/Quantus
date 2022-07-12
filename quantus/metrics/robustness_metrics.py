@@ -695,7 +695,7 @@ class AvgSensitivity(Metric):
         a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
         x_batch_flat = x_batch.reshape(x_batch.shape[0], -1)
         # create array to save perturbed samples
-        perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape), dtype=float)
+        perturbed_samples = np.zeros((self.nr_samples * x_batch.shape[0], *x_batch[0].shape), dtype=float)
         # create array to save intermediary results
         sensitivities_norm = np.zeros((self.nr_samples, x_batch.shape[0]))
 
@@ -712,16 +712,18 @@ class AvgSensitivity(Metric):
                 )
                 x_input = model.shape_input(x_perturbed, x.shape, channel_first=True)
                 asserts.assert_perturbation_caused_change(x=x, x_perturbed=x_perturbed)
-                perturbed_samples[j][ix] = x_input
+                perturbed_samples[ix + j * x_batch.shape[0]] = x_input
+
+        a_perturbed_all = explain_func(
+                model=model.get_model(),
+                inputs=perturbed_samples,
+                targets=np.tile(y_batch, self.nr_samples),
+                **self.kwargs,
+            )
 
         for j in range(self.nr_samples):
             # Generate explanation based on perturbed input x.
-            a_perturbed = explain_func(
-                model=model.get_model(),
-                inputs=perturbed_samples[j],
-                targets=y_batch,
-                **self.kwargs,
-            )
+            a_perturbed = a_perturbed_all[j * x_batch.shape[0]: (j + 1) * x_batch.shape[0]]
 
             if self.normalise:
                 a_perturbed = np.apply_along_axis(self.normalise_func, -1, a_perturbed)
