@@ -692,11 +692,12 @@ class AvgSensitivity(Metric):
                 enumerate(zip(x_batch_s, y_batch, a_batch)), total=len(x_batch_s)
             )
 
+        a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
+        x_batch_flat = x_batch.reshape(x_batch.shape[0], -1)
         # create array to save perturbed samples
         perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape), dtype=float)
-        a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
+        # create array to save intermediary results
         sensitivities_norm = np.zeros((self.nr_samples, x_batch.shape[0]))
-        norm_denominator = np.apply_along_axis(self.norm_denominator, -1, x_batch.reshape(x_batch.shape[0], -1))
 
         for ix, (x, y, a) in iterator:
 
@@ -744,9 +745,9 @@ class AvgSensitivity(Metric):
             sensitivities_norm[j] = np.array(
                 list(
                     map(
-                        lambda z1, z2: self.norm_numerator(a=z1) / z2,
+                        lambda z1, z2: self.norm_numerator(a=z1) / self.norm_denominator(z2),
                         sensitivities,
-                        norm_denominator,
+                        x_batch_flat,
                     )
                 ),
                 dtype=float,
