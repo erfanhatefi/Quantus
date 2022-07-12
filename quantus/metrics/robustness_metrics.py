@@ -677,6 +677,13 @@ class AvgSensitivity(Metric):
         # Asserts.
         asserts.assert_attributions(x_batch=x_batch_s, a_batch=a_batch)
 
+        # normalise or take abs values of explanations
+        if self.normalise:
+            a_batch = np.apply_along_axis(self.normalise_func, -1, a_batch)
+
+        if self.abs:
+            a_batch = np.abs(a_batch)
+
         # Use tqdm progressbar if not disabled.
         if not self.display_progressbar:
             iterator = enumerate(zip(x_batch_s, y_batch, a_batch))
@@ -686,20 +693,13 @@ class AvgSensitivity(Metric):
             )
 
         # create array to save perturbed samples
-        perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape))
+        perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape), dtype=float)
         a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
         sensitivities_norm = np.zeros((self.nr_samples, x_batch.shape[0]))
         norm_denominator = np.apply_along_axis(self.norm_denominator, -1, x_batch.reshape(x_batch.shape[0], -1))
 
         for ix, (x, y, a) in iterator:
 
-            if self.normalise:
-                a = self.normalise_func(a)
-
-            if self.abs:
-                a = np.abs(a)
-
-            self.sub_results = []
             for j in range(self.nr_samples):
 
                 # Perturb input.
@@ -718,7 +718,7 @@ class AvgSensitivity(Metric):
             a_perturbed = explain_func(
                 model=model.get_model(),
                 inputs=perturbed_samples[j],
-                targets=y,
+                targets=y_batch,
                 **self.kwargs,
             )
 
@@ -728,7 +728,7 @@ class AvgSensitivity(Metric):
             if self.abs:
                 a_perturbed = np.abs(a_perturbed)
 
-            a_perturbed_flat = a_perturbed.reshape(a_batch.shape[0], -1)
+            a_perturbed_flat = a_perturbed.reshape(a_perturbed.shape[0], -1)
 
             sensitivities = np.array(
                 list(
@@ -741,7 +741,16 @@ class AvgSensitivity(Metric):
                 dtype=float,
             )
 
-            sensitivities_norm[j] = np.apply_along_axis(self.norm_numerator, -1, sensitivities) / norm_denominator
+            sensitivities_norm[j] = np.array(
+                list(
+                    map(
+                        lambda z1, z2: self.norm_numerator(a=z1) / z2,
+                        sensitivities,
+                        norm_denominator,
+                    )
+                ),
+                dtype=float,
+            )
 
         self.last_results = np.mean(sensitivities_norm, axis=0, dtype=float)
         self.all_results.append(self.last_results)
