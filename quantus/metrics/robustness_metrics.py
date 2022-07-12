@@ -685,6 +685,11 @@ class AvgSensitivity(Metric):
                 enumerate(zip(x_batch_s, y_batch, a_batch)), total=len(x_batch_s)
             )
 
+        # create array to save perturbed samples
+        perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape))
+        img_size = x_batch[0][0].size
+        a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
+
         for ix, (x, y, a) in iterator:
 
             if self.normalise:
@@ -694,7 +699,7 @@ class AvgSensitivity(Metric):
                 a = np.abs(a)
 
             self.sub_results = []
-            for _ in range(self.nr_samples):
+            for j in range(self.nr_samples):
 
                 # Perturb input.
                 x_perturbed = self.perturb_func(
@@ -705,32 +710,42 @@ class AvgSensitivity(Metric):
                 )
                 x_input = model.shape_input(x_perturbed, x.shape, channel_first=True)
                 asserts.assert_perturbation_caused_change(x=x, x_perturbed=x_perturbed)
+                perturbed_samples[j][ix] = x_input
 
-                # Generate explanation based on perturbed input x.
-                a_perturbed = explain_func(
-                    model=model.get_model(),
-                    inputs=x_input,
-                    targets=y,
-                    **self.kwargs,
-                )
+        norm_denominator = np.apply_along_axis(self.norm_denominator, -1, x_batch.reshape(x_batch.shape[0], -1))
 
-                if self.normalise:
-                    a_perturbed = self.normalise_func(a_perturbed)
+        for j in range(self.nr_samples):
+            # Generate explanation based on perturbed input x.
+            a_perturbed = explain_func(
+                model=model.get_model(),
+                inputs=perturbed_samples[j],
+                targets=y,
+                **self.kwargs,
+            )
 
-                if self.abs:
-                    a_perturbed = np.abs(a_perturbed)
+            if self.normalise:
+                a_perturbed = np.apply_along_axis(self.normalise_func, -1, a_perturbed)
 
-                sensitivities = self.similarity_func(
-                    a=a.flatten(), b=a_perturbed.flatten()
-                )
-                sensitivities_norm = self.norm_numerator(
-                    a=sensitivities
-                ) / self.norm_denominator(a=x.flatten())
+            if self.abs:
+                a_perturbed = np.apply_along_axis(np.abs, -1, a_perturbed)
 
-                self.sub_results.append(sensitivities_norm)
+            a_perturbed_flat = a_perturbed.reshape(a_batch.shape[0], -1)
+
+            sensitivities = np.array(
+                list(
+                    map(
+                        lambda z1, z2: self.similarity_func(a=z1, b=z2),
+                        a_batch_flat,
+                        a_perturbed_flat,
+                    )
+                ),
+                dtype=float,
+            )
+
+            sensitivities_norm = np.apply_along_axis(self.norm_numerator, -1, sensitivities) / norm_denominator
 
             # Append average sensitivity score.
-            self.last_results.append(float(np.mean(self.sub_results)))
+            self.last_results.append(float(np.mean(sensitivities_norm)))
 
         self.all_results.append(self.last_results)
 
