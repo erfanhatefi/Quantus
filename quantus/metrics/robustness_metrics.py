@@ -687,8 +687,9 @@ class AvgSensitivity(Metric):
 
         # create array to save perturbed samples
         perturbed_samples = np.zeros((self.nr_samples, x_batch.shape[0], *x_batch[0].shape))
-        img_size = x_batch[0][0].size
         a_batch_flat = a_batch.reshape(a_batch.shape[0], -1)
+        sensitivities_norm = np.zeros((self.nr_samples, x_batch.shape[0]))
+        norm_denominator = np.apply_along_axis(self.norm_denominator, -1, x_batch.reshape(x_batch.shape[0], -1))
 
         for ix, (x, y, a) in iterator:
 
@@ -712,8 +713,6 @@ class AvgSensitivity(Metric):
                 asserts.assert_perturbation_caused_change(x=x, x_perturbed=x_perturbed)
                 perturbed_samples[j][ix] = x_input
 
-        norm_denominator = np.apply_along_axis(self.norm_denominator, -1, x_batch.reshape(x_batch.shape[0], -1))
-
         for j in range(self.nr_samples):
             # Generate explanation based on perturbed input x.
             a_perturbed = explain_func(
@@ -727,7 +726,7 @@ class AvgSensitivity(Metric):
                 a_perturbed = np.apply_along_axis(self.normalise_func, -1, a_perturbed)
 
             if self.abs:
-                a_perturbed = np.apply_along_axis(np.abs, -1, a_perturbed)
+                a_perturbed = np.abs(a_perturbed)
 
             a_perturbed_flat = a_perturbed.reshape(a_batch.shape[0], -1)
 
@@ -742,11 +741,9 @@ class AvgSensitivity(Metric):
                 dtype=float,
             )
 
-            sensitivities_norm = np.apply_along_axis(self.norm_numerator, -1, sensitivities) / norm_denominator
+            sensitivities_norm[j] = np.apply_along_axis(self.norm_numerator, -1, sensitivities) / norm_denominator
 
-            # Append average sensitivity score.
-            self.last_results.append(float(np.mean(sensitivities_norm)))
-
+        self.last_results = np.mean(sensitivities_norm, axis=0, dtype=float)
         self.all_results.append(self.last_results)
 
         return self.last_results
